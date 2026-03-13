@@ -1,5 +1,27 @@
 # Bíblia ACF para DOS
 
+## Português
+
+Leitor da Bíblia ACF em modo texto para DOS, feito em Turbo Pascal.
+O projeto usa dados binários (`ACF.DAT`, `ACF.IDX`, `ACF.MET`) e roda em DOSBox-X/FreeDOS.
+
+Resumo rápido:
+
+- aplicação em Turbo Pascal para ambiente DOS
+- base bíblica empacotada em arquivos binários
+- foco em compatibilidade com FreeDOS e DOSBox-X
+
+## English
+
+ACF Bible reader for DOS, written in Turbo Pascal.
+The project uses binary data files (`ACF.DAT`, `ACF.IDX`, `ACF.MET`) and runs on DOSBox-X/FreeDOS.
+
+Quick summary:
+
+- Turbo Pascal application for DOS environments
+- Bible content packed into binary data files
+- focused on FreeDOS and DOSBox-X compatibility
+
 Leitor da Bíblia ACF em modo texto para DOS, feito em Turbo Pascal.
 O projeto usa dados binários (`ACF.DAT`, `ACF.IDX`, `ACF.MET`) e executa no DOSBox-X/FreeDOS.
 
