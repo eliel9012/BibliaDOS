@@ -4,6 +4,8 @@
 
 ACF Bible reader for DOS, written in Turbo Pascal and designed for text-mode environments such as DOSBox-X and FreeDOS.
 
+![Books screen](screenshots/tela-livros.png)
+
 ### Features
 
 - text-mode Bible reader for DOS
@@ -46,7 +48,7 @@ From the host:
 
 ```bash
 dosbox-x -fastlaunch -exit \
-  -c "mount c /home/pi/dos_biblia" \
+  -c "mount c /path/to/BibliaDOS" \
   -c "c:" \
   -c "cd \\" \
   -c "TP55\\TPC.EXE /B BIBLIA.PAS"
@@ -64,15 +66,17 @@ Expected output:
 - `ACF.IDX`
 - `ACF.MET`
 
+`acf_clean.json` is not included in this repository. It must be a UTF-8 JSON list of books, each with `name`, `abbrev` and `chapters` (a list of chapters, each a list of verse strings). The script warns about characters that have no CP850 equivalent (they become `?` in DOS).
+
 ### Main Keys
 
 - `Enter`: select
-- `ESC` or `b`: go back
+- `ESC` or `b`: go back (on the books view it asks before quitting)
 - `q`: quit
 - `F1`: help
 - arrow keys, `PgUp`, `PgDn`: navigate
 - books view: `Left/Right` switches OT/NT columns
-- books view: type `ap 22 1` and press `Enter` to jump directly
+- books view: type `ap 22 1` and press `Enter` to jump directly; abbreviations (`gn`, `hb`, `1co`...) or the start of the book name work, with or without accents (`genesis 1 1`, `exodo 3 14`); `job` = Jó (`jo` = João)
 - reading view: `Left/Right` changes chapter
 - reading view: `g` jumps to verse
 
@@ -88,6 +92,8 @@ The data uses `CP850` for Portuguese text. If accents look wrong, switch to code
 ## Português
 
 Leitor da Bíblia ACF para DOS, feito em Turbo Pascal e pensado para ambientes texto como DOSBox-X e FreeDOS.
+
+![Tela de livros](screenshots/tela-livros.png)
 
 ### Funcionalidades
 
@@ -131,7 +137,7 @@ No host:
 
 ```bash
 dosbox-x -fastlaunch -exit \
-  -c "mount c /home/pi/dos_biblia" \
+  -c "mount c /caminho/para/BibliaDOS" \
   -c "c:" \
   -c "cd \\" \
   -c "TP55\\TPC.EXE /B BIBLIA.PAS"
@@ -149,15 +155,17 @@ Saída esperada:
 - `ACF.IDX`
 - `ACF.MET`
 
+O `acf_clean.json` não está neste repositório. Ele deve ser uma lista JSON (UTF-8) de livros, cada um com `name`, `abbrev` e `chapters` (lista de capítulos, cada um uma lista de versos). O script avisa sobre caracteres sem equivalente em CP850 (que virariam `?` no DOS).
+
 ### Teclas Principais
 
 - `Enter`: selecionar
-- `ESC` ou `b`: voltar
+- `ESC` ou `b`: voltar (na tela de livros, pergunta antes de sair)
 - `q`: sair
 - `F1`: ajuda
 - setas, `PgUp`, `PgDn`: navegar
 - tela de livros: `Left/Right` alterna entre colunas VT/NT
-- tela de livros: digite `ap 22 1` e pressione `Enter` para ir direto
+- tela de livros: digite `ap 22 1` e pressione `Enter` para ir direto; vale abreviação (`gn`, `hb`, `1co`...) ou o começo do nome, com ou sem acento (`genesis 1 1`, `exodo 3 14`); `job` = Jó (`jo` = João)
 - tela de leitura: `Left/Right` muda de capítulo
 - tela de leitura: `g` vai para o verso
 
@@ -169,3 +177,9 @@ O `START.BAT` já aplica:
 
 - `CHCP 850`
 - `KEYB BR 850`
+
+## Licença / License
+
+O texto bíblico é a Almeida Corrigida Fiel (ACF), © Sociedade Bíblica Trinitariana do Brasil. Verifique os termos de uso da SBTB antes de redistribuir os arquivos `ACF.*`.
+
+The Bible text is the Almeida Corrigida Fiel (ACF), © Sociedade Bíblica Trinitariana do Brasil. Check SBTB's terms of use before redistributing the `ACF.*` files.

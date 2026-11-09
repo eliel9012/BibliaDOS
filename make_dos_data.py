@@ -43,6 +43,22 @@ def _normalize_text(s: str) -> str:
     return s.strip()
 
 
+# Caracteres sem equivalente no codepage (viram "?" no DOS), com um exemplo de onde aparecem.
+_UNMAPPED: dict[str, str] = {}
+
+
+def _encode(s: str, enc: str, where: str) -> bytes:
+    try:
+        return s.encode(enc)
+    except UnicodeEncodeError:
+        for ch in s:
+            try:
+                ch.encode(enc)
+            except UnicodeEncodeError:
+                _UNMAPPED.setdefault(ch, where)
+        return s.encode(enc, errors="replace")
+
+
 def _load_json(path: Path) -> Any:
     with path.open("r", encoding="utf-8-sig") as f:
         return json.load(f)
@@ -102,11 +118,11 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"ERRO: livro #{book_i} invalido (name/abbrev/chapters).", file=sys.stderr)
                 return 5
 
-            name_b = _normalize_text(name).encode(enc, errors="replace")
+            name_b = _encode(_normalize_text(name), enc, name)
             if len(name_b) > 32:
                 name_b = name_b[:32]
 
-            abbrev_b = abbrev.encode(enc, errors="replace")
+            abbrev_b = _encode(abbrev, enc, name)
             if len(abbrev_b) > MAX_ABBREV_LEN:
                 abbrev_b = abbrev_b[:MAX_ABBREV_LEN]
 
@@ -122,7 +138,7 @@ def main(argv: list[str] | None = None) -> int:
 
                 for verse_i, verse in enumerate(chap):
                     text = _normalize_text(str(verse))
-                    b = text.encode(enc, errors="replace")
+                    b = _encode(text, enc, f"{name} {chap_i+1}:{verse_i+1}")
                     if len(b) > 0xFFFF:
                         print(
                             f"ERRO: verso muito grande em {name} {chap_i+1}:{verse_i+1} ({len(b)} bytes).",
@@ -169,6 +185,10 @@ def main(argv: list[str] | None = None) -> int:
     print("  Versos   :", total_verses)
     print("  Encoding :", enc)
     print("  Arquivos :", dat_path.name, idx_path.name, met_path.name)
+    if _UNMAPPED:
+        print(f"AVISO: {len(_UNMAPPED)} caractere(s) sem equivalente em {enc} viraram '?':", file=sys.stderr)
+        for ch, where in sorted(_UNMAPPED.items()):
+            print(f"  U+{ord(ch):04X} {ch!r} (ex: {where})", file=sys.stderr)
     return 0
 
 
