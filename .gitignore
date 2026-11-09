@@ -13,3 +13,4 @@
 
 # Local validation binary (FreePascal)
 BIBLIA
+__pycache__/

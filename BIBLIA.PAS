@@ -65,6 +65,7 @@ var
 
   VerseBuf: array[1..VERSE_BUF_SIZE] of Char;
   VerseBufLen: Word;
+  VerseCut: Boolean; { DrawVerse nao coube inteiro na tela }
 
   Running: Boolean;
   JumpDirect: Boolean;
@@ -94,12 +95,10 @@ begin
 end;
 
 procedure ClearLine(Y: Byte);
-var
-  i: Byte;
 begin
+  { ClrEol nao rola a tela; escrever 80 espacos na linha 25 rolava tudo }
   GotoXY(1, Y);
-  for i := 1 to SCREEN_W do
-    Write(' ');
+  ClrEol;
 end;
 
 procedure WriteAt(X, Y: Byte; S: String);
@@ -109,6 +108,9 @@ begin
   if (X < 1) or (X > SCREEN_W) or (Y < 1) or (Y > SCREEN_H) then
     Exit;
   maxLen := SCREEN_W - X + 1;
+  { ultima coluna da ultima linha faz o Crt rolar a tela }
+  if Y = SCREEN_H then
+    Dec(maxLen);
   if Length(S) > maxLen then
     S := Copy(S, 1, maxLen);
   GotoXY(X, Y);
@@ -136,6 +138,26 @@ begin
   for i := 1 to Length(S) do
     S[i] := UpCase(S[i]);
   UpperStr := S;
+end;
+
+{ Maiusculas sem acento (CP850), para comparar "genesis" com "Genesis" acentuado }
+function FoldStr(S: String): String;
+var
+  i: Byte;
+begin
+  for i := 1 to Length(S) do
+    case Ord(S[i]) of
+      $A0, $85, $83, $C6, $84, $B5, $B7, $B6, $C7, $8E: S[i] := 'A';
+      $82, $8A, $88, $89, $90, $D4, $D2, $D3: S[i] := 'E';
+      $A1, $8D, $8C, $8B, $D6, $DE, $D7, $D8: S[i] := 'I';
+      $A2, $95, $93, $E4, $94, $E0, $E3, $E2, $E5, $99: S[i] := 'O';
+      $A3, $97, $96, $81, $E9, $EB, $EA, $9A: S[i] := 'U';
+      $87, $80: S[i] := 'C';
+      $A4, $A5: S[i] := 'N';
+    else
+      S[i] := UpCase(S[i]);
+    end;
+  FoldStr := S;
 end;
 
 function HasParam(P: String): Boolean;
@@ -166,6 +188,8 @@ begin
   WriteLn;
   WriteLn('Pressione qualquer tecla...');
   ch := ReadKey;
+  NormVideo;
+  ClrScr;
   Halt(1);
 end;
 
@@ -334,7 +358,7 @@ begin
   if IOResult <> 0 then
     Exit;
   BlockRead(FIdx, Offs, 4, n);
-  if (n <> 4) then
+  if (IOResult <> 0) or (n <> 4) then
     Exit;
   GetVerseOffset := True;
 end;
@@ -355,13 +379,13 @@ begin
   if IOResult <> 0 then
     Exit;
   BlockRead(FDat, l, 2, n);
-  if n <> 2 then
+  if (IOResult <> 0) or (n <> 2) then
     Exit;
   VerseBufLen := l;
   if VerseBufLen > VERSE_BUF_SIZE then
     VerseBufLen := VERSE_BUF_SIZE;
   BlockRead(FDat, VerseBuf, VerseBufLen, n);
-  if n <> VerseBufLen then
+  if (IOResult <> 0) or (n <> VerseBufLen) then
     Exit;
 
   { normaliza: remove controles e espacos duplicados }
@@ -427,6 +451,7 @@ var
   numS: String;
   line: String;
 begin
+  VerseCut := False;
   if VerseBufLen = 0 then
   begin
     Str(VerseNum:3, numS);
@@ -488,6 +513,7 @@ begin
 
     firstLine := False;
   end;
+  VerseCut := (i <= VerseBufLen);
 end;
 
 function ChapterId(BookIdx: Byte; ChapNum: Word): Word;
@@ -548,8 +574,9 @@ begin
   WriteLn('  Setas / PgUp / PgDn  mover');
   WriteLn('  Left/Right           VT/NT (menu de livros)');
   WriteLn('  Digite               ex: ap 22 1  (ir direto p/ verso)');
+  WriteLn('                       genesis 1 1 / exodo 3 14 / job 1 1');
   WriteLn('  Enter                selecionar');
-  WriteLn('  ESC / b              voltar (ou limpa digitacao)');
+  WriteLn('  ESC / b              voltar / limpa digitacao / sair (pergunta)');
   WriteLn('  q                    sair');
   WriteLn;
   WriteLn('Leitura:');
@@ -562,11 +589,27 @@ begin
   WaitAnyKey;
 end;
 
+function ConfirmQuit: Boolean;
+var
+  ch: Char;
+begin
+  SetTitle;
+  ClearLine(FOOT_Y2);
+  WriteAt(2, FOOT_Y2, 'Sair do programa? (S/N)');
+  ch := ReadKey;
+  if ch = #0 then
+  begin
+    ch := ReadKey;
+    ch := 'N';
+  end;
+  ConfirmQuit := (ch = 's') or (ch = 'S') or (ch = 'q') or (ch = 'Q');
+end;
+
 function PromptNumber(Prompt: String; MinV, MaxV: Word; var Value: Word): Boolean;
 var
   buf: String;
   ch: Char;
-  n: Integer;
+  n: LongInt;
   done: Boolean;
   code: Integer;
 begin
@@ -884,7 +927,7 @@ var
 
   function StrToWord(S: String; var W: Word): Boolean;
   var
-    n: Integer;
+    n: LongInt;
     code: Integer;
   begin
     StrToWord := False;
@@ -921,12 +964,39 @@ var
         Exit;
       end;
 
-    { 2) match prefixo unico do nome (fallback) }
+    { 1b) abreviacao sem acento, se unica (ex: "jo" ja casou com Joao acima) }
+    Tok := FoldStr(Tok);
+    if Tok = 'JOB' then
+      Tok := 'JO#';
+    matches := 0;
+    last := 0;
+    for ii := 1 to TotalBooks do
+      if (BookAbbrev[ii] <> '') then
+      begin
+        u := FoldStr(BookAbbrev[ii]);
+        if (Tok = 'JO#') and (u = 'JO') and (BookAbbrev[ii] <> 'JO') then
+          u := 'JO#';
+        if u = Tok then
+        begin
+          Inc(matches);
+          last := ii;
+        end;
+      end;
+    if matches = 1 then
+    begin
+      Bk := last;
+      FindBookToken := True;
+      Exit;
+    end;
+    if Tok = 'JO#' then
+      Tok := 'JOB';
+
+    { 2) match prefixo unico do nome, sem acento (fallback) }
     matches := 0;
     last := 0;
     for ii := 1 to TotalBooks do
     begin
-      u := UpperStr(BookLabel(ii));
+      u := FoldStr(BookLabel(ii));
       if Copy(u, 1, Length(Tok)) = Tok then
       begin
         Inc(matches);
@@ -1144,21 +1214,28 @@ begin
     end
     else
     begin
-      if (ch = 'q') or (ch = 'Q') then
+      { q/b so sao comandos com a linha de digitacao vazia
+        (senao "hb", "ob", "mq" nao podiam ser digitados) }
+      if ((ch = 'q') or (ch = 'Q')) and (Length(jumpBuf) = 0) then
       begin
         Running := False;
         Exit;
       end;
 
-      if (ch = #27) or (ch = 'b') or (ch = 'B') then
+      if (ch = #27) or (((ch = 'b') or (ch = 'B')) and (Length(jumpBuf) = 0)) then
       begin
         if Length(jumpBuf) > 0 then
         begin
           jumpBuf := '';
           DrawJumpLine;
         end
-        else
+        else if ConfirmQuit then
+        begin
+          Running := False;
           Exit;
+        end
+        else
+          DrawJumpLine;
       end
       else if ch = #13 then
       begin
@@ -1177,6 +1254,8 @@ begin
         end
         else
         begin
+          if CurBook <> sel then
+            CurChap := 1;
           CurBook := sel;
           ScreenBooksSelect := True;
           Exit;
@@ -1191,7 +1270,7 @@ begin
         end;
       end
       else if ((ch >= 'A') and (ch <= 'Z')) or ((ch >= 'a') and (ch <= 'z')) or
-              ((ch >= '0') and (ch <= '9')) or (ch = ' ') then
+              ((ch >= '0') and (ch <= '9')) or (ch = ' ') or (ch >= #128) then
       begin
         if Length(jumpBuf) < 30 then
         begin
@@ -1297,7 +1376,7 @@ begin
   maxCh := BookChapCount[CurBook];
   pageSize := CONTENT_Y2 - CONTENT_Y + 1;
 
-  sel := 1;
+  sel := CurChap;
   if sel < 1 then sel := 1;
   if sel > maxCh then sel := maxCh;
   top := 1;
@@ -1509,7 +1588,9 @@ var
       if ReadVerse(globalIdx) then
       begin
         DrawVerse(v, False, y);
-        pageVisibleTo := v;
+        { verso cortado no rodape nao conta como visivel }
+        if (not VerseCut) or (v = TopVerse) then
+          pageVisibleTo := v;
       end
       else
       begin
@@ -1723,8 +1804,13 @@ begin
     Running := False;
   end
   else
+  begin
     MainUI;
+    NormVideo;
+    ClrScr;
+  end;
 
+  NormVideo;
   Close(FIdx);
   Close(FDat);
 end.
